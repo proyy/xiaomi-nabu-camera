@@ -1,0 +1,38 @@
+--- a/arch/arm64/boot/dts/qcom/sm8150-xiaomi-nabu-camera.dts
++++ b/arch/arm64/boot/dts/qcom/sm8150-xiaomi-nabu-camera.dts
+@@ -1,4 +1,5 @@
+ #include "sm8150-xiaomi-nabu-maverick.dts"
+ #include "sm8150-camera-topology-draft.dtsi"
+ #include "sm8150-nabu-front-draft.dtsi"
+ #include "sm8150-nabu-both-cameras.dtsi"
++#include "sm8150-nabu-cn3927.dtsi"
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sm8150-nabu-cn3927.dtsi
+@@ -0,0 +1,27 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* AF rail and I/O supply from the nabu OEM camera device tree. */
++/ {
++	nabu_rear_vaf: regulator-camera-rear-focus {
++		compatible = "regulator-fixed";
++		regulator-name = "nabu-camera-rear-focus-2p8";
++		regulator-min-microvolt = <2800000>;
++		regulator-max-microvolt = <2800000>;
++		regulator-enable-ramp-delay = <135>;
++		vin-supply = <&vreg_bob>;
++		gpio = <&tlmm 29 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++};
++
++&cci0_i2c0 {
++	nabu_rear_vcm: lens@c {
++		compatible = "xiaomi,nabu-cn3927";
++		reg = <0x0c>;
++		vaf-supply = <&nabu_rear_vaf>;
++		vio-supply = <&vreg_l1c_1p8>;
++	};
++};
++
++&nabu_camera_rear {
++	lens-focus = <&nabu_rear_vcm>;
++};

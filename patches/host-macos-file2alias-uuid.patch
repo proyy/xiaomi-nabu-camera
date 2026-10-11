@@ -1,0 +1,14 @@
+--- a/scripts/mod/file2alias.c
++++ b/scripts/mod/file2alias.c
+@@ -30,6 +30,11 @@
+ 
+ #include <ctype.h>
+ #include <stdbool.h>
++
++#ifdef __APPLE__
++/* Darwin already declares uuid_t as an array; the kernel ABI uses a struct. */
++#define uuid_t kernel_uuid_t
++#endif
+ 
+ typedef uint32_t	__u32;
+ typedef uint16_t	__u16;

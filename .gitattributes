@@ -1,0 +1,6 @@
+# Preserve exact upstream patches, including their context whitespace.
+patches/** -whitespace
+licenses/** -whitespace
+sources/** -whitespace
+# Markdown uses two trailing spaces for intentional hard line breaks.
+*.md whitespace=-blank-at-eol

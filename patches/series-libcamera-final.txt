@@ -1,0 +1,9 @@
+libcamera/0001-nabu-analogue-gain-models.patch
+libcamera/0002-cam-report-frame-buffer-status.patch
+libcamera/0003-cam-keep-interrupts-responsive-during-file-capture.patch
+libcamera/0004-simple-camss-use-disjoint-camera-pipelines.patch
+libcamera/0005-cam-stop-started-cameras-on-session-failure.patch
+libcamera/0006-simple-agc-highlight-exposure-limit.patch
+libcamera/0007-egl-meter-full-raw-input.patch
+libcamera/0008-cam-publish-complete-preview-frames.patch
+libcamera/0009-egl-packed-raw-precision-and-coordinates.patch

@@ -1,0 +1,20 @@
+{
+  "base_commit": "191e202178f02430b5942397c70d215cdd2056fa",
+  "files": {
+    "include/libcamera/internal/software_isp/swisp_stats.h": "a4b38d3e2747cff78d164f9b2c40a3d41e7f27977644f413516d1c5e4ac48a0c",
+    "src/apps/cam/camera_session.cpp": "4cdb5c02f960fbf7468dac57c84674bd6707b0173abfba8b49005a4df784151f",
+    "src/apps/cam/main.cpp": "7d0ef0bd3a088e68a068478ae02f191a67717ddee46d33d53416ee0c1aff97f0",
+    "src/apps/common/event_loop.cpp": "113b5c4267292c1be356fefe2821df4eab161025d6a580e5e7eeac909bfc5d08",
+    "src/ipa/libipa/camera_sensor_helper.cpp": "f75a363291fc283193c9831d24595099aead84a4f0e215421e44e813b057249b",
+    "src/ipa/simple/algorithms/agc.cpp": "35fc4e3095f2f2d33df9c1d562a6501d85650e75574419bc5794a41fc286ef7e",
+    "src/ipa/simple/algorithms/agc.h": "dc07ac3d5bdb9faf1552e4d77a6db2f8dc8ecea564d046a27871b6016b78c3ad",
+    "src/ipa/simple/data/meson.build": "69b746f03b21c5165b756b96f7ade71f62c5f7d78e6f21064a21113ee7b74185",
+    "src/ipa/simple/data/ov13b10.yaml": "079bce58c6b413e9d80e067e9037f0699b5e585e33f368c9b05c60ba4d36d7b5",
+    "src/ipa/simple/data/ov8856.yaml": "079bce58c6b413e9d80e067e9037f0699b5e585e33f368c9b05c60ba4d36d7b5",
+    "src/libcamera/pipeline/simple/simple.cpp": "08a061e7f3c9ea3e2016c7d35cad4be600a7cd6cd74b0793b718df0d8fcdbd68",
+    "src/libcamera/software_isp/debayer_egl.cpp": "65304c89f9d92f8e4fc89f1d6dc805292ab0d6afe5a62ee606faf54c43536cca",
+    "src/libcamera/software_isp/swstats_cpu.cpp": "49f8edd7fa81f8afc1ece1c35503e93b671dd6c1b3ea67b80edc97396589f47f",
+    "src/apps/cam/file_sink.cpp": "e1ce1adf33a9adc6262a0ab35d82fe41da860403caa45b5b2c83a6220fabb605",
+    "src/libcamera/shaders/bayer_1x_packed.frag": "79dad1c2fd383a0fe90cd1cc974b5dd59b40d2303305852d1f22e74756c53d67"
+  }
+}

@@ -1,0 +1,13 @@
+diff --git a/drivers/media/platform/qcom/camss/camss-vfe.c b/drivers/media/platform/qcom/camss/camss-vfe.c
+--- a/drivers/media/platform/qcom/camss/camss-vfe.c
++++ b/drivers/media/platform/qcom/camss/camss-vfe.c
+@@ -1543,7 +1543,8 @@
+ 		}
+ 
+ 		video_out->ops = &vfe->video_ops;
+-		video_out->bpl_alignment = 8;
++		/* Titan 170 writes each RDI line on a 128-bit bus boundary. */
++		video_out->bpl_alignment = vfe->camss->version == CAMSS_8150 ? 16 : 8;
+ 		video_out->line_based = 0;
+ 		if (i == VFE_LINE_PIX) {
+ 			video_out->bpl_alignment = 16;

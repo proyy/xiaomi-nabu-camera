@@ -1,0 +1,51 @@
+diff --git a/src/apps/common/event_loop.cpp b/src/apps/common/event_loop.cpp
+index b6230f4..ccec242 100644
+--- a/src/apps/common/event_loop.cpp
++++ b/src/apps/common/event_loop.cpp
+@@ -19,26 +19,33 @@ EventLoop::EventLoop()
+ 	assert(!instance_);
+ 
+ 	evthread_use_pthreads();
+-	base_ = event_base_new();
++	struct event_config *config = event_config_new();
++	assert(config);
++	int ret = event_config_set_max_dispatch_interval(config, nullptr, 1, 0);
++	assert(!ret);
++	base_ = event_base_new_with_config(config);
++	event_config_free(config);
++	assert(base_);
+ 	instance_ = this;
+ 
+ 	callsTrigger_ = event_new(base_, -1, EV_PERSIST, [](evutil_socket_t, short, void *closure) {
+ 		auto *self = static_cast<EventLoop *>(closure);
+ 
+-		for (;;) {
+-			std::function<void()> call;
+-
+-			{
+-				std::lock_guard locker(self->lock_);
+-				if (self->calls_.empty())
+-					break;
+-
+-				call = std::move(self->calls_.front());
+-				self->calls_.pop_front();
+-			}
++		std::deque<std::function<void()>> calls;
++		{
++			std::lock_guard locker(self->lock_);
++			calls.swap(self->calls_);
++		}
+ 
+-			call();
++		/* Bound this batch so sustained capture cannot starve fd events. */
++		while (!calls.empty()) {
++			calls.front()();
++			calls.pop_front();
+ 		}
++
++		std::lock_guard locker(self->lock_);
++		if (!self->calls_.empty())
++			event_active(self->callsTrigger_, 0, 0);
+ 	}, this);
+ 	assert(callsTrigger_);
+ 	event_add(callsTrigger_, nullptr);

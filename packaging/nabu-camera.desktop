@@ -1,0 +1,14 @@
+# SPDX-License-Identifier: LicenseRef-Nabu-Camera-NonCommercial-1.0
+# Copyright (c) 2026 zouhong <admin@proyy.com>
+# Noncommercial use only; see LICENSE. Third-party components retain their licenses.
+[Desktop Entry]
+Type=Application
+Name=Pad Camera
+Name[zh_CN]=Pad 相机
+Comment=Front and rear cameras for Xiaomi Pad 5
+Comment[zh_CN]=小米平板 5 前后相机、拍照和自动对焦
+Exec=nabu-camera
+Icon=camera-photo
+Terminal=false
+Categories=AudioVideo;Video;Graphics;Photography;
+StartupNotify=true

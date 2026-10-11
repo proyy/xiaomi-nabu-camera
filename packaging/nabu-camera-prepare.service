@@ -1,0 +1,19 @@
+# SPDX-License-Identifier: LicenseRef-Nabu-Camera-NonCommercial-1.0
+# Copyright (c) 2026 zouhong <admin@proyy.com>
+# Noncommercial use only; see LICENSE. Third-party components retain their licenses.
+[Unit]
+Description=Read this Xiaomi nabu camera's focus calibration
+After=systemd-modules-load.service systemd-udev-settle.service
+Wants=systemd-udev-settle.service
+Before=display-manager.service
+ConditionPathExists=/proc/device-tree/compatible
+ConditionKernelVersion=6.1.10-nabu-camera3
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /opt/nabu-camera/install_support.py calibrate
+RemainAfterExit=yes
+TimeoutStartSec=30
+
+[Install]
+WantedBy=multi-user.target

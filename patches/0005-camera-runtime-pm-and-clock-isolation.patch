@@ -1,0 +1,223 @@
+diff --git a/drivers/media/i2c/ov8856.c b/drivers/media/i2c/ov8856.c
+--- a/drivers/media/i2c/ov8856.c
++++ b/drivers/media/i2c/ov8856.c
+@@ -1710,6 +1710,8 @@
+ 		return -ENXIO;
+ 	}
+ 
++	dev_info(&client->dev, "identified OV8856 chip 0x%06x\n", val);
++
+ 	ret = ov8856_write_reg(ov8856, OV8856_REG_MODE_SELECT,
+ 			       OV8856_REG_VALUE_08BIT, OV8856_MODE_STREAMING);
+ 	if (ret)
+@@ -1750,7 +1752,6 @@
+ 		return ret;
+ 	}
+ 
+-	dev_info(&client->dev, "identified OV8856 chip 0x%06x\n", val);
+ 	ov8856->identified = true;
+ 
+ 	return 0;
+@@ -2214,6 +2215,21 @@
+ 	clk_disable_unprepare(ov8856->xvclk);
+ }
+ 
++static int __maybe_unused ov8856_runtime_suspend(struct device *dev)
++{
++	struct v4l2_subdev *sd = dev_get_drvdata(dev);
++
++	__ov8856_power_off(to_ov8856(sd));
++	return 0;
++}
++
++static int __maybe_unused ov8856_runtime_resume(struct device *dev)
++{
++	struct v4l2_subdev *sd = dev_get_drvdata(dev);
++
++	return __ov8856_power_on(to_ov8856(sd));
++}
++
+ static int __maybe_unused ov8856_suspend(struct device *dev)
+ {
+ 	struct v4l2_subdev *sd = dev_get_drvdata(dev);
+@@ -2222,11 +2238,8 @@
+ 	mutex_lock(&ov8856->mutex);
+ 	if (ov8856->streaming)
+ 		ov8856_stop_streaming(ov8856);
+-
+-	__ov8856_power_off(ov8856);
+ 	mutex_unlock(&ov8856->mutex);
+-
+-	return 0;
++	return pm_runtime_force_suspend(dev);
+ }
+ 
+ static int __maybe_unused ov8856_resume(struct device *dev)
+@@ -2235,27 +2248,20 @@
+ 	struct ov8856 *ov8856 = to_ov8856(sd);
+ 	int ret;
+ 
++	ret = pm_runtime_force_resume(dev);
++	if (ret)
++		return ret;
+ 	mutex_lock(&ov8856->mutex);
+-
+-	ret = __ov8856_power_on(ov8856);
+-	if (ret) {
+-		mutex_unlock(&ov8856->mutex);
+-		return ret;
+-	}
+-
+ 	if (ov8856->streaming) {
+ 		ret = ov8856_start_streaming(ov8856);
+ 		if (ret) {
++			ov8856_stop_streaming(ov8856);
+ 			ov8856->streaming = false;
+-			ov8856_stop_streaming(ov8856);
+-			mutex_unlock(&ov8856->mutex);
+-			return ret;
++			pm_runtime_put(dev);
+ 		}
+ 	}
+-
+ 	mutex_unlock(&ov8856->mutex);
+-
+-	return 0;
++	return ret;
+ }
+ 
+ static int ov8856_set_format(struct v4l2_subdev *sd,
+@@ -2599,6 +2605,7 @@
+ 
+ static const struct dev_pm_ops ov8856_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(ov8856_suspend, ov8856_resume)
++	SET_RUNTIME_PM_OPS(ov8856_runtime_suspend, ov8856_runtime_resume, NULL)
+ };
+ 
+ #ifdef CONFIG_ACPI
+diff --git a/drivers/media/i2c/ov13b10.c b/drivers/media/i2c/ov13b10.c
+--- a/drivers/media/i2c/ov13b10.c
++++ b/drivers/media/i2c/ov13b10.c
+@@ -1249,6 +1249,7 @@
+ 		ret = ov13b10_start_streaming(ov13b);
+ 		if (ret) {
+ 			ov13b10_stop_streaming(ov13b);
++			pm_runtime_put(dev);
+ 			ov13b->streaming = false;
+ 		}
+ 	}
+diff --git a/drivers/clk/qcom/clk-alpha-pll.c b/drivers/clk/qcom/clk-alpha-pll.c
+--- a/drivers/clk/qcom/clk-alpha-pll.c
++++ b/drivers/clk/qcom/clk-alpha-pll.c
+@@ -1421,8 +1421,8 @@
+ 	}
+ 
+ 	return regmap_update_bits(regmap, PLL_USER_CTL(pll),
+-				  PLL_POST_DIV_MASK(pll) << pll->post_div_shift,
+-				  val << pll->post_div_shift);
++				  PLL_POST_DIV_MASK(pll) << PLL_POST_DIV_SHIFT,
++				  val << PLL_POST_DIV_SHIFT);
+ }
+ 
+ const struct clk_ops clk_alpha_pll_postdiv_trion_ops = {
+@@ -2383,3 +2383,32 @@
+ 	.set_rate = clk_regera_pll_set_rate,
+ };
+ EXPORT_SYMBOL_GPL(clk_alpha_pll_regera_ops);
++
++/* SM8150 CAMCC has a separate odd output field at bit 12. */
++static int
++clk_cam8150_pll_postdiv_set_rate(struct clk_hw *hw, unsigned long rate,
++			       unsigned long parent_rate)
++{
++	struct clk_alpha_pll_postdiv *pll = to_clk_alpha_pll_postdiv(hw);
++	struct regmap *regmap = pll->clkr.regmap;
++	int i, val = 0, div;
++
++	div = DIV_ROUND_UP_ULL(parent_rate, rate);
++	for (i = 0; i < pll->num_post_div; i++) {
++		if (pll->post_div_table[i].div == div) {
++			val = pll->post_div_table[i].val;
++			break;
++		}
++	}
++
++	return regmap_update_bits(regmap, PLL_USER_CTL(pll),
++				  PLL_POST_DIV_MASK(pll) << pll->post_div_shift,
++				  val << pll->post_div_shift);
++}
++
++const struct clk_ops clk_alpha_pll_postdiv_cam8150_ops = {
++	.recalc_rate = clk_trion_pll_postdiv_recalc_rate,
++	.round_rate = clk_trion_pll_postdiv_round_rate,
++	.set_rate = clk_cam8150_pll_postdiv_set_rate,
++};
++EXPORT_SYMBOL_GPL(clk_alpha_pll_postdiv_cam8150_ops);
+diff --git a/drivers/clk/qcom/clk-alpha-pll.h b/drivers/clk/qcom/clk-alpha-pll.h
+--- a/drivers/clk/qcom/clk-alpha-pll.h
++++ b/drivers/clk/qcom/clk-alpha-pll.h
+@@ -145,6 +145,7 @@
+ extern const struct clk_ops clk_alpha_pll_trion_ops;
+ extern const struct clk_ops clk_alpha_pll_fixed_trion_ops;
+ extern const struct clk_ops clk_alpha_pll_postdiv_trion_ops;
++extern const struct clk_ops clk_alpha_pll_postdiv_cam8150_ops;
+ 
+ extern const struct clk_ops clk_alpha_pll_lucid_ops;
+ #define clk_alpha_pll_fixed_lucid_ops clk_alpha_pll_fixed_trion_ops
+diff --git a/drivers/clk/qcom/camcc-sm8150.c b/drivers/clk/qcom/camcc-sm8150.c
+--- a/drivers/clk/qcom/camcc-sm8150.c
++++ b/drivers/clk/qcom/camcc-sm8150.c
+@@ -97,7 +97,7 @@
+ 		},
+ 		.num_parents = 1,
+ 		.flags = CLK_SET_RATE_PARENT,
+-		.ops = &clk_alpha_pll_postdiv_trion_ops,
++		.ops = &clk_alpha_pll_postdiv_cam8150_ops,
+ 	},
+ };
+ 
+@@ -120,7 +120,7 @@
+ 		},
+ 		.num_parents = 1,
+ 		.flags = CLK_SET_RATE_PARENT,
+-		.ops = &clk_alpha_pll_postdiv_trion_ops,
++		.ops = &clk_alpha_pll_postdiv_cam8150_ops,
+ 	},
+ };
+ 
+@@ -174,7 +174,7 @@
+ 		},
+ 		.num_parents = 1,
+ 		.flags = CLK_SET_RATE_PARENT,
+-		.ops = &clk_alpha_pll_postdiv_trion_ops,
++		.ops = &clk_alpha_pll_postdiv_cam8150_ops,
+ 	},
+ };
+ 
+@@ -228,7 +228,7 @@
+ 		},
+ 		.num_parents = 1,
+ 		.flags = CLK_SET_RATE_PARENT,
+-		.ops = &clk_alpha_pll_postdiv_trion_ops,
++		.ops = &clk_alpha_pll_postdiv_cam8150_ops,
+ 	},
+ };
+ 
+@@ -282,7 +282,7 @@
+ 		},
+ 		.num_parents = 1,
+ 		.flags = CLK_SET_RATE_PARENT,
+-		.ops = &clk_alpha_pll_postdiv_trion_ops,
++		.ops = &clk_alpha_pll_postdiv_cam8150_ops,
+ 	},
+ };
+ 
+@@ -336,7 +336,7 @@
+ 		},
+ 		.num_parents = 1,
+ 		.flags = CLK_SET_RATE_PARENT,
+-		.ops = &clk_alpha_pll_postdiv_trion_ops,
++		.ops = &clk_alpha_pll_postdiv_cam8150_ops,
+ 	},
+ };
+ 

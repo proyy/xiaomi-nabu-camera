@@ -1,0 +1,226 @@
+diff --git a/include/libcamera/internal/software_isp/swisp_stats.h b/include/libcamera/internal/software_isp/swisp_stats.h
+index d9d0d9b..9c88b3e 100644
+--- a/include/libcamera/internal/software_isp/swisp_stats.h
++++ b/include/libcamera/internal/software_isp/swisp_stats.h
+@@ -43,6 +43,13 @@ struct SwIspStats {
+ 	 * \brief A histogram of luminance values of all the sampled pixels
+ 	 */
+ 	Histogram yHistogram;
++	/**
++	 * \brief Per-channel histograms before black level and white balance
++	 *
++	 * These let exposure constraints protect a saturated colour channel even
++	 * when its weighted luminance is low.
++	 */
++	std::array<Histogram, 3> rgbHistogram;
+ };
+ 
+ } /* namespace libcamera */
+diff --git a/src/ipa/simple/algorithms/agc.cpp b/src/ipa/simple/algorithms/agc.cpp
+index a13a755..65c8ca3 100644
+--- a/src/ipa/simple/algorithms/agc.cpp
++++ b/src/ipa/simple/algorithms/agc.cpp
+@@ -9,11 +9,13 @@
+ 
+ #include <algorithm>
+ #include <cmath>
++#include <limits>
+ #include <stdint.h>
+ 
+ #include <libcamera/base/log.h>
+ 
+ #include "control_ids.h"
++#include "libipa/histogram.h"
+ 
+ namespace libcamera {
+ 
+@@ -65,14 +67,29 @@ Agc::Agc()
+ {
+ }
+ 
+-void Agc::updateExposure(IPAContext &context, IPAFrameContext &frameContext, double exposureMSV)
++int Agc::init([[maybe_unused]] IPAContext &context, const ValueNode &tuningData)
++{
++	highlightQuantile_ = tuningData["highlightQuantile"].get<double>().value_or(0.98);
++	highlightTarget_ = tuningData["highlightTarget"].get<double>().value_or(0.0);
++	if (!std::isfinite(highlightQuantile_) || !std::isfinite(highlightTarget_) ||
++	    highlightQuantile_ <= 0.0 || highlightQuantile_ >= 1.0 ||
++	    highlightTarget_ < 0.0 || highlightTarget_ > 1.0)
++		return -EINVAL;
++	if (highlightTarget_ > 0.0)
++		LOG(IPASoftExposure, Info) << "RGB highlight constraint: quantile "
++			<< highlightQuantile_ << " target " << highlightTarget_;
++	return 0;
++}
++
++void Agc::updateExposure(IPAContext &context, IPAFrameContext &frameContext,
++			 double exposureMSV, double highlightGainLimit)
+ {
+ 	int32_t &exposure = frameContext.sensor.exposure;
+ 	double &again = frameContext.sensor.gain;
+ 
+ 	double error = kExposureOptimal - exposureMSV;
+ 
+-	if (std::abs(error) <= kExposureSatisfactory)
++	if (std::abs(error) <= kExposureSatisfactory && highlightGainLimit >= 1.0)
+ 		return;
+ 
+ 	/*
+@@ -82,7 +99,12 @@ void Agc::updateExposure(IPAContext &context, IPAFrameContext &frameContext, dou
+ 	 */
+ 	float step = std::clamp(static_cast<float>(error) * kExpProportionalGain,
+ 				-kExpMaxStep, kExpMaxStep);
+-	float factor = 1.0f + step;
++	float meanFactor = std::abs(error) <= kExposureSatisfactory ? 1.0f : 1.0f + step;
++	float factor = std::clamp(static_cast<float>(std::min<double>(meanFactor, highlightGainLimit)),
++				 1.0f - kExpMaxStep, 1.0f + kExpMaxStep);
++	/* Avoid chasing histogram bin noise when the highlight constraint binds. */
++	if (highlightGainLimit < meanFactor && std::abs(factor - 1.0f) < 0.01f)
++		return;
+ 
+ 	if (factor > 1.0f) {
+ 		/* Scene too dark: increase exposure first, then gain. */
+@@ -189,7 +211,27 @@ void Agc::process(IPAContext &context,
+ 	}
+ 
+ 	float exposureMSV = (denom == 0 ? 0 : static_cast<float>(num) / denom);
+-	updateExposure(context, frameContext, exposureMSV);
++	double highlightGainLimit = std::numeric_limits<double>::infinity();
++	if (highlightTarget_ > 0.0 && denom) {
++		/* A mean over the top quantile is steadier than a single percentile.
++		 * The bound is exposure policy, not sensor or colour calibration.
++		 */
++		double black = context.activeState.blc.level / 256.0;
++		for (unsigned int c = 0; c < 3; c++) {
++			const auto &channel = stats->rgbHistogram[c];
++			Histogram hist(Span<const uint32_t>(channel.data(), channel.size()));
++			if (!hist.total())
++				continue;
++			double bright = hist.interQuantileMean(highlightQuantile_, 1.0) / hist.bins();
++			bright = (bright - black) / (1.0 - black);
++			bright *= std::max(context.activeState.awb.gains[c], frameContext.gains[c]);
++			LOG(IPASoftExposure, Debug) << "Highlight channel " << c
++				<< " mean " << bright << " samples " << hist.total();
++			if (bright > 0.0)
++				highlightGainLimit = std::min(highlightGainLimit, highlightTarget_ / bright);
++		}
++	}
++	updateExposure(context, frameContext, exposureMSV, highlightGainLimit);
+ }
+ 
+ REGISTER_IPA_ALGORITHM(Agc, "Agc")
+diff --git a/src/ipa/simple/algorithms/agc.h b/src/ipa/simple/algorithms/agc.h
+index 112d9f5..34f5ba3 100644
+--- a/src/ipa/simple/algorithms/agc.h
++++ b/src/ipa/simple/algorithms/agc.h
+@@ -19,13 +19,18 @@ public:
+ 	Agc();
+ 	~Agc() = default;
+ 
++	int init(IPAContext &context, const ValueNode &tuningData) override;
++
+ 	void process(IPAContext &context, const uint32_t frame,
+ 		     IPAFrameContext &frameContext,
+ 		     const SwIspStats *stats,
+ 		     ControlList &metadata) override;
+ 
+ private:
+-	void updateExposure(IPAContext &context, IPAFrameContext &frameContext, double exposureMSV);
++	void updateExposure(IPAContext &context, IPAFrameContext &frameContext,
++			    double exposureMSV, double highlightGainLimit);
++	double highlightQuantile_ = 0.98;
++	double highlightTarget_ = 0.0;
+ };
+ 
+ } /* namespace ipa::soft::algorithms */
+diff --git a/src/ipa/simple/data/meson.build b/src/ipa/simple/data/meson.build
+index 92795ee..109bafd 100644
+--- a/src/ipa/simple/data/meson.build
++++ b/src/ipa/simple/data/meson.build
+@@ -1,6 +1,8 @@
+ # SPDX-License-Identifier: CC0-1.0
+ 
+ conf_files = files([
++	'ov8856.yaml',
++	'ov13b10.yaml',
+     'uncalibrated.yaml',
+ ])
+ 
+diff --git a/src/libcamera/software_isp/swstats_cpu.cpp b/src/libcamera/software_isp/swstats_cpu.cpp
+index 7fb77ce..3c0f992 100644
+--- a/src/libcamera/software_isp/swstats_cpu.cpp
++++ b/src/libcamera/software_isp/swstats_cpu.cpp
+@@ -187,7 +187,10 @@ static constexpr unsigned int kBlueYMul = 29; /* 0.114 * 256 */
+ 	yVal = r * kRedYMul;               \
+ 	yVal += g * kGreenYMul;            \
+ 	yVal += b * kBlueYMul;             \
+-	stats.yHistogram[yVal * SwIspStats::kYHistogramSize / (256 * 256 * (div))]++;
++	stats.yHistogram[yVal * SwIspStats::kYHistogramSize / (256 * 256 * (div))]++; \
++	stats.rgbHistogram[0][r * SwIspStats::kYHistogramSize / (256 * (div))]++; \
++	stats.rgbHistogram[1][g * SwIspStats::kYHistogramSize / (256 * (div))]++; \
++	stats.rgbHistogram[2][b * SwIspStats::kYHistogramSize / (256 * (div))]++;
+ 
+ #define SWSTATS_FINISH_LINE_STATS() \
+ 	stats.sum_.r() += sumR;     \
+@@ -392,6 +395,8 @@ void SwStatsCpu::startFrame(uint32_t frame)
+ 	for (auto &s : stats_) {
+ 		s.sum_ = RGB<uint64_t>({ 0, 0, 0 });
+ 		s.yHistogram.fill(0);
++		for (auto &histogram : s.rgbHistogram)
++			histogram.fill(0);
+ 	}
+ }
+ 
+@@ -409,10 +414,15 @@ void SwStatsCpu::finishFrame(uint32_t frame, uint32_t bufferId)
+ 	if (valid) {
+ 		sharedStats_->sum_ = RGB<uint64_t>({ 0, 0, 0 });
+ 		sharedStats_->yHistogram.fill(0);
++		for (auto &histogram : sharedStats_->rgbHistogram)
++			histogram.fill(0);
+ 		for (const auto &s : stats_) {
+ 			sharedStats_->sum_ += s.sum_;
+-			for (unsigned int j = 0; j < SwIspStats::kYHistogramSize; j++)
++			for (unsigned int j = 0; j < SwIspStats::kYHistogramSize; j++) {
+ 				sharedStats_->yHistogram[j] += s.yHistogram[j];
++				for (unsigned int c = 0; c < 3; c++)
++					sharedStats_->rgbHistogram[c][j] += s.rgbHistogram[c][j];
++			}
+ 		}
+ 
+ 		sharedStats_->sum_ >>= sumShift_;
+diff --git a/src/ipa/simple/data/ov8856.yaml b/src/ipa/simple/data/ov8856.yaml
+new file mode 100644
+--- /dev/null
++++ b/src/ipa/simple/data/ov8856.yaml
+@@ -0,0 +1,13 @@
++# SPDX-License-Identifier: CC0-1.0
++# Exposure policy for the nabu test prefix; colour/LSC are not calibrated.
++%YAML 1.1
++---
++version: 1
++algorithms:
++  - BlackLevel:
++  - Awb:
++  - Adjust:
++  - Agc:
++      highlightQuantile: 0.98
++      highlightTarget: 0.65
++...
+diff --git a/src/ipa/simple/data/ov13b10.yaml b/src/ipa/simple/data/ov13b10.yaml
+new file mode 100644
+--- /dev/null
++++ b/src/ipa/simple/data/ov13b10.yaml
+@@ -0,0 +1,13 @@
++# SPDX-License-Identifier: CC0-1.0
++# Exposure policy for the nabu test prefix; colour/LSC are not calibrated.
++%YAML 1.1
++---
++version: 1
++algorithms:
++  - BlackLevel:
++  - Awb:
++  - Adjust:
++  - Agc:
++      highlightQuantile: 0.98
++      highlightTarget: 0.65
++...

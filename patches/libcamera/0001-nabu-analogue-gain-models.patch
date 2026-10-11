@@ -1,0 +1,23 @@
+--- a/src/ipa/libipa/camera_sensor_helper.cpp
++++ b/src/ipa/libipa/camera_sensor_helper.cpp
+@@ -791,6 +791,20 @@
+ };
+ REGISTER_CAMERA_SENSOR_HELPER("ov64a40", CameraSensorHelperOv64a40)
+ 
++/* Both nabu sensors expose linear analogue gain codes with unity at 128. */
++class CameraSensorHelperNabuOmnivision : public CameraSensorHelper
++{
++public:
++	CameraSensorHelperNabuOmnivision()
++	{
++		gain_ = AnalogueGainLinear{ 1, 0, 0, 128 };
++	}
++};
++class CameraSensorHelperOv8856 : public CameraSensorHelperNabuOmnivision {};
++class CameraSensorHelperOv13b10 : public CameraSensorHelperNabuOmnivision {};
++REGISTER_CAMERA_SENSOR_HELPER("ov8856", CameraSensorHelperOv8856)
++REGISTER_CAMERA_SENSOR_HELPER("ov13b10", CameraSensorHelperOv13b10)
++
+ class CameraSensorHelperOv8858 : public CameraSensorHelper
+ {
+ public:

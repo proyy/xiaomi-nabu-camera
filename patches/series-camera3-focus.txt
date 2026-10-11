@@ -1,0 +1,9 @@
+camera1/0001-ov8856-nabu-power-and-error-handling.patch
+camera1/0002-ov13b10-of-and-nabu-power-management.patch
+camera1/0003-sm8150-camcc-camss-backport.patch
+camera1/0004-nabu-camera-devicetree.patch
+0005-camera-runtime-pm-and-clock-isolation.patch
+0006-sm8150-rdi-align-to-128-bit-bus.patch
+0007-ov8856-keep-active-format-stable.patch
+0008-cci-preserve-combined-register-reads.patch
+0009-nabu-native-focus-dt.patch

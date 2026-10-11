@@ -1,0 +1,32 @@
+{
+  "base_commit": "191e202178f02430b5942397c70d215cdd2056fa",
+  "series": [
+    "libcamera/0001-nabu-analogue-gain-models.patch",
+    "libcamera/0002-cam-report-frame-buffer-status.patch",
+    "libcamera/0003-cam-keep-interrupts-responsive-during-file-capture.patch",
+    "libcamera/0004-simple-camss-use-disjoint-camera-pipelines.patch",
+    "libcamera/0005-cam-stop-started-cameras-on-session-failure.patch",
+    "libcamera/0006-simple-agc-highlight-exposure-limit.patch",
+    "libcamera/0007-egl-meter-full-raw-input.patch",
+    "libcamera/0008-cam-publish-complete-preview-frames.patch",
+    "libcamera/0009-egl-packed-raw-precision-and-coordinates.patch"
+  ],
+  "files": {
+    "include/libcamera/internal/software_isp/swisp_stats.h": true,
+    "src/apps/cam/camera_session.cpp": true,
+    "src/apps/cam/main.cpp": true,
+    "src/apps/common/event_loop.cpp": true,
+    "src/ipa/libipa/camera_sensor_helper.cpp": true,
+    "src/ipa/simple/algorithms/agc.cpp": true,
+    "src/ipa/simple/algorithms/agc.h": true,
+    "src/ipa/simple/data/meson.build": true,
+    "src/ipa/simple/data/ov13b10.yaml": true,
+    "src/ipa/simple/data/ov8856.yaml": true,
+    "src/libcamera/pipeline/simple/simple.cpp": true,
+    "src/libcamera/software_isp/debayer_egl.cpp": true,
+    "src/libcamera/software_isp/swstats_cpu.cpp": true,
+    "src/apps/cam/file_sink.cpp": true,
+    "src/libcamera/shaders/bayer_1x_packed.frag": true
+  },
+  "passed": true
+}

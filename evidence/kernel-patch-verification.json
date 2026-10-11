@@ -1,0 +1,28 @@
+{
+  "base_commit": "0e784bd693e1940dee39483b0bc33c4c1a1ffe50",
+  "files": {
+    "arch/arm64/boot/dts/qcom/sm8150-camera-topology-draft.dtsi": true,
+    "arch/arm64/boot/dts/qcom/sm8150-nabu-both-cameras.dtsi": true,
+    "arch/arm64/boot/dts/qcom/sm8150-nabu-cn3927.dtsi": true,
+    "arch/arm64/boot/dts/qcom/sm8150-nabu-front-draft.dtsi": true,
+    "arch/arm64/boot/dts/qcom/sm8150-xiaomi-nabu-camera-review.dts": true,
+    "arch/arm64/boot/dts/qcom/sm8150-xiaomi-nabu-camera.dts": true,
+    "drivers/clk/qcom/Kconfig": true,
+    "drivers/clk/qcom/Makefile": true,
+    "drivers/clk/qcom/camcc-sm8150.c": true,
+    "drivers/clk/qcom/clk-alpha-pll.c": true,
+    "drivers/clk/qcom/clk-alpha-pll.h": true,
+    "drivers/i2c/busses/i2c-qcom-cci.c": true,
+    "drivers/media/i2c/ov13b10.c": true,
+    "drivers/media/i2c/ov8856.c": true,
+    "drivers/media/platform/qcom/camss/camss-csid.c": true,
+    "drivers/media/platform/qcom/camss/camss-csiphy-3ph-1-0.c": true,
+    "drivers/media/platform/qcom/camss/camss-csiphy.c": true,
+    "drivers/media/platform/qcom/camss/camss-vfe-170.c": true,
+    "drivers/media/platform/qcom/camss/camss-vfe.c": true,
+    "drivers/media/platform/qcom/camss/camss-video.c": true,
+    "drivers/media/platform/qcom/camss/camss.c": true,
+    "drivers/media/platform/qcom/camss/camss.h": true
+  },
+  "passed": true
+}

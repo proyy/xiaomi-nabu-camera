@@ -1,0 +1,32 @@
+# SPDX-License-Identifier: LicenseRef-Nabu-Camera-NonCommercial-1.0
+# Copyright (c) 2026 zouhong <admin@proyy.com>
+# Noncommercial use only; see LICENSE. Third-party components retain their licenses.
+[Unit]
+Description=Xiaomi Pad front/rear camera compatibility service
+Requires=nabu-camera-prepare.service
+After=nabu-camera-prepare.service systemd-udev-settle.service
+Before=display-manager.service
+ConditionKernelVersion=6.1.10-nabu-camera3
+
+[Service]
+Type=notify
+User=nabu-camera
+Group=video
+SupplementaryGroups=video render
+RuntimeDirectory=nabu-camera
+RuntimeDirectoryMode=0750
+ExecStart=/usr/bin/python3 /opt/nabu-camera/bridge_service.py
+ExecStartPost=+/usr/bin/python3 /opt/nabu-camera/install_support.py publish-devices
+CacheDirectory=nabu-camera
+Environment=XDG_CACHE_HOME=/var/cache/nabu-camera
+TimeoutStartSec=30
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=10
+NoNewPrivileges=yes
+ProtectHome=yes
+ProtectSystem=strict
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target

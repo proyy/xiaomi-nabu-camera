@@ -1,0 +1,4 @@
+#define _GNU_SOURCE 1
+#define PACKAGE "pipewire"
+#define PACKAGE_VERSION "1.0.5"
+#define HAVE_GSTREAMER_DEVICE_PROVIDER 1

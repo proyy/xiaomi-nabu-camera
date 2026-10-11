@@ -1,0 +1,27 @@
+diff --git a/src/apps/cam/main.cpp b/src/apps/cam/main.cpp
+index 120917e..1098f7a 100644
+--- a/src/apps/cam/main.cpp
++++ b/src/apps/cam/main.cpp
+@@ -281,6 +281,7 @@ int CamApp::run()
+ 	}
+ 
+ 	/* 4. Start capture. */
++	std::vector<CameraSession *> started;
+ 	for (const auto &session : sessions) {
+ 		if (!session->options().isSet(OptCapture))
+ 			continue;
+@@ -288,10 +289,14 @@ int CamApp::run()
+ 		ret = session->start();
+ 		if (ret) {
+ 			std::cout << "Failed to start camera session" << std::endl;
++			session->stop();
++			for (CameraSession *running : started)
++				running->stop();
+ 			return ret;
+ 		}
+ 
+ 		loopUsers_++;
++		started.push_back(session.get());
+ 	}
+ 
+ 	/* 5. Enable hotplug monitoring. */

@@ -1,0 +1,291 @@
+diff --git a/drivers/media/i2c/ov13b10.c b/drivers/media/i2c/ov13b10.c
+--- a/drivers/media/i2c/ov13b10.c
++++ b/drivers/media/i2c/ov13b10.c
+@@ -2,8 +2,13 @@
+ // Copyright (c) 2021 Intel Corporation.
+ 
+ #include <linux/acpi.h>
++#include <linux/clk.h>
++#include <linux/delay.h>
++#include <linux/gpio/consumer.h>
++#include <linux/regulator/consumer.h>
+ #include <linux/i2c.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/pm_runtime.h>
+ #include <media/v4l2-ctrls.h>
+ #include <media/v4l2-device.h>
+@@ -569,9 +574,16 @@
+ 	}
+ };
+ 
++static const char * const ov13b10_supply_names[] = {
++	"dovdd", "dvdd", "avdd",
++};
++
+ struct ov13b10 {
+ 	struct v4l2_subdev sd;
+ 	struct media_pad pad;
++	struct clk *img_clk;
++	struct gpio_desc *reset;
++	struct regulator_bulk_data supplies[ARRAY_SIZE(ov13b10_supply_names)];
+ 
+ 	struct v4l2_ctrl_handler ctrl_handler;
+ 	/* V4L2 Controls */
+@@ -1113,34 +1125,135 @@
+ 	return ret;
+ }
+ 
+-static int __maybe_unused ov13b10_suspend(struct device *dev)
+-{
+-	struct v4l2_subdev *sd = dev_get_drvdata(dev);
+-	struct ov13b10 *ov13b = to_ov13b10(sd);
+-
+-	if (ov13b->streaming)
+-		ov13b10_stop_streaming(ov13b);
+-
+-	return 0;
+-}
+-
+-static int __maybe_unused ov13b10_resume(struct device *dev)
++/* OF resources are managed explicitly; ACPI retains its PM domain path. */
++static int ov13b10_power_on(struct device *dev)
+ {
+ 	struct v4l2_subdev *sd = dev_get_drvdata(dev);
+ 	struct ov13b10 *ov13b = to_ov13b10(sd);
+ 	int ret;
+ 
++	if (is_acpi_node(dev_fwnode(dev)))
++		return 0;
++	if (of_machine_is_compatible("xiaomi,nabu")) {
++		int i;
++
++		gpiod_set_value_cansleep(ov13b->reset, 1);
++		usleep_range(1000, 1500);
++		for (i = 0; i < ARRAY_SIZE(ov13b10_supply_names); i++) {
++			ret = regulator_enable(ov13b->supplies[i].consumer);
++			if (ret)
++				goto nabu_disable_supplies;
++		}
++		gpiod_set_value_cansleep(ov13b->reset, 0);
++		usleep_range(5000, 5500);
++		ret = clk_prepare_enable(ov13b->img_clk);
++		if (ret) {
++			gpiod_set_value_cansleep(ov13b->reset, 1);
++			goto nabu_disable_supplies;
++		}
++		usleep_range(5000, 5500);
++		return 0;
++
++nabu_disable_supplies:
++		while (i-- > 0)
++			regulator_disable(ov13b->supplies[i].consumer);
++		return ret;
++	}
++
++	ret = clk_prepare_enable(ov13b->img_clk);
++	if (ret)
++		return ret;
++	ret = regulator_bulk_enable(ARRAY_SIZE(ov13b10_supply_names), ov13b->supplies);
++	if (ret) {
++		clk_disable_unprepare(ov13b->img_clk);
++		return ret;
++	}
++	gpiod_set_value_cansleep(ov13b->reset, 0);
++	usleep_range(5000, 5500);
++	return 0;
++}
++
++static int ov13b10_power_off(struct device *dev)
++{
++	struct v4l2_subdev *sd = dev_get_drvdata(dev);
++	struct ov13b10 *ov13b = to_ov13b10(sd);
++
++	if (is_acpi_node(dev_fwnode(dev)))
++		return 0;
++	if (of_machine_is_compatible("xiaomi,nabu")) {
++		int i;
++
++		clk_disable_unprepare(ov13b->img_clk);
++		usleep_range(1000, 1500);
++		gpiod_set_value_cansleep(ov13b->reset, 1);
++		usleep_range(1000, 1500);
++		for (i = ARRAY_SIZE(ov13b10_supply_names) - 1; i >= 0; i--)
++			regulator_disable(ov13b->supplies[i].consumer);
++		return 0;
++	}
++
++	gpiod_set_value_cansleep(ov13b->reset, 1);
++	regulator_bulk_disable(ARRAY_SIZE(ov13b10_supply_names), ov13b->supplies);
++	clk_disable_unprepare(ov13b->img_clk);
++	return 0;
++}
++
++static int ov13b10_get_pm_resources(struct ov13b10 *ov13b, struct device *dev)
++{
++	unsigned int i;
++	int ret;
++
++	if (is_acpi_node(dev_fwnode(dev)))
++		return 0;
++	ov13b->reset = devm_gpiod_get_optional(dev, "reset", GPIOD_OUT_HIGH);
++	if (IS_ERR(ov13b->reset))
++		return dev_err_probe(dev, PTR_ERR(ov13b->reset), "failed to get reset GPIO\n");
++	ov13b->img_clk = devm_clk_get(dev, NULL);
++	if (IS_ERR(ov13b->img_clk))
++		return dev_err_probe(dev, PTR_ERR(ov13b->img_clk), "failed to get sensor clock\n");
++	ret = clk_set_rate(ov13b->img_clk, OV13B10_EXT_CLK);
++	if (ret)
++		return ret;
++	if (clk_get_rate(ov13b->img_clk) != OV13B10_EXT_CLK)
++		return dev_err_probe(dev, -EINVAL, "sensor clock must be 19.2 MHz\n");
++	for (i = 0; i < ARRAY_SIZE(ov13b10_supply_names); i++)
++		ov13b->supplies[i].supply = ov13b10_supply_names[i];
++	return devm_regulator_bulk_get(dev, ARRAY_SIZE(ov13b10_supply_names), ov13b->supplies);
++}
++
++static int __maybe_unused ov13b10_suspend(struct device *dev)
++{
++	struct v4l2_subdev *sd = dev_get_drvdata(dev);
++	struct ov13b10 *ov13b = to_ov13b10(sd);
++	int ret;
++
++	mutex_lock(&ov13b->mutex);
++	if (ov13b->streaming)
++		ov13b10_stop_streaming(ov13b);
++	ret = pm_runtime_force_suspend(dev);
++	mutex_unlock(&ov13b->mutex);
++	return ret;
++}
++
++static int __maybe_unused ov13b10_resume(struct device *dev)
++{
++	struct v4l2_subdev *sd = dev_get_drvdata(dev);
++	struct ov13b10 *ov13b = to_ov13b10(sd);
++	int ret;
++
++	mutex_lock(&ov13b->mutex);
++	ret = pm_runtime_force_resume(dev);
++	if (ret)
++		goto unlock;
+ 	if (ov13b->streaming) {
+ 		ret = ov13b10_start_streaming(ov13b);
+-		if (ret)
+-			goto error;
+-	}
+-
+-	return 0;
+-
+-error:
+-	ov13b10_stop_streaming(ov13b);
+-	ov13b->streaming = false;
++		if (ret) {
++			ov13b10_stop_streaming(ov13b);
++			ov13b->streaming = false;
++		}
++	}
++unlock:
++	mutex_unlock(&ov13b->mutex);
+ 	return ret;
+ }
+ 
+@@ -1162,6 +1275,7 @@
+ 		return -EIO;
+ 	}
+ 
++	dev_info(&client->dev, "identified OV13B10 chip 0x%06x\n", val);
+ 	return 0;
+ }
+ 
+@@ -1395,11 +1509,18 @@
+ 	/* Initialize subdev */
+ 	v4l2_i2c_subdev_init(&ov13b->sd, client, &ov13b10_subdev_ops);
+ 
++	ret = ov13b10_get_pm_resources(ov13b, &client->dev);
++	if (ret)
++		return ret;
++	ret = ov13b10_power_on(&client->dev);
++	if (ret)
++		return ret;
++
+ 	/* Check module identity */
+ 	ret = ov13b10_identify_module(ov13b);
+ 	if (ret) {
+ 		dev_err(&client->dev, "failed to find sensor: %d\n", ret);
+-		return ret;
++		goto error_power_off;
+ 	}
+ 
+ 	/* Set default mode to max resolution */
+@@ -1407,7 +1528,7 @@
+ 
+ 	ret = ov13b10_init_controls(ov13b);
+ 	if (ret)
+-		return ret;
++		goto error_power_off;
+ 
+ 	/* Initialize subdev */
+ 	ov13b->sd.internal_ops = &ov13b10_internal_ops;
+@@ -1423,16 +1544,14 @@
+ 		goto error_handler_free;
+ 	}
+ 
+-	ret = v4l2_async_register_subdev_sensor(&ov13b->sd);
+-	if (ret < 0)
+-		goto error_media_entity;
+-
+-	/*
+-	 * Device is already turned on by i2c-core with ACPI domain PM.
+-	 * Enable runtime PM and turn off the device.
+-	 */
+ 	pm_runtime_set_active(&client->dev);
+ 	pm_runtime_enable(&client->dev);
++	ret = v4l2_async_register_subdev_sensor(&ov13b->sd);
++	if (ret < 0) {
++		pm_runtime_disable(&client->dev);
++		pm_runtime_set_suspended(&client->dev);
++		goto error_media_entity;
++	}
+ 	pm_runtime_idle(&client->dev);
+ 
+ 	return 0;
+@@ -1444,6 +1563,8 @@
+ 	ov13b10_free_controls(ov13b);
+ 	dev_err(&client->dev, "%s failed:%d\n", __func__, ret);
+ 
++error_power_off:
++	ov13b10_power_off(&client->dev);
+ 	return ret;
+ }
+ 
+@@ -1457,11 +1578,21 @@
+ 	ov13b10_free_controls(ov13b);
+ 
+ 	pm_runtime_disable(&client->dev);
++	if (!pm_runtime_status_suspended(&client->dev))
++		ov13b10_power_off(&client->dev);
++	pm_runtime_set_suspended(&client->dev);
+ }
+ 
+ static const struct dev_pm_ops ov13b10_pm_ops = {
+ 	SET_SYSTEM_SLEEP_PM_OPS(ov13b10_suspend, ov13b10_resume)
+-};
++	SET_RUNTIME_PM_OPS(ov13b10_power_off, ov13b10_power_on, NULL)
++};
++
++static const struct of_device_id ov13b10_of_match[] = {
++	{ .compatible = "ovti,ov13b10" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, ov13b10_of_match);
+ 
+ #ifdef CONFIG_ACPI
+ static const struct acpi_device_id ov13b10_acpi_ids[] = {
+@@ -1477,6 +1608,7 @@
+ 		.name = "ov13b10",
+ 		.pm = &ov13b10_pm_ops,
+ 		.acpi_match_table = ACPI_PTR(ov13b10_acpi_ids),
++		.of_match_table = ov13b10_of_match,
+ 	},
+ 	.probe_new = ov13b10_probe,
+ 	.remove = ov13b10_remove,

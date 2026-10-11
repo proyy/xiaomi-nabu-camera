@@ -1,0 +1,412 @@
+diff --git a/arch/arm64/boot/dts/qcom/sm8150-camera-topology-draft.dtsi b/arch/arm64/boot/dts/qcom/sm8150-camera-topology-draft.dtsi
+new file mode 100644
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sm8150-camera-topology-draft.dtsi
+@@ -0,0 +1,153 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * SM8150 camera topology draft for maverick 0e784bd693e1 (6.1.10).
++ * CAMSS node adapted from Robin Snyders' Hotdog 0056 patch, GPL-2.0.
++ * CAMCC node from upstream Linux. No blocks are enabled by this file.
++ * Requires a real SM8150 CAMCC/CAMSS driver port; not a boot-ready patch.
++ * This tree uses one-cell ICC specifiers; 6.16+ needs its own two-cell form.
++ */
++#include <dt-bindings/clock/qcom,sm8150-camcc.h>
++
++&soc {
++		camss: camss@acb3000 {
++			compatible = "qcom,sm8150-camss";
++
++			reg = <0 0x0acb3000 0 0x1000>,
++			      <0 0x0acba000 0 0x1000>,
++			      <0 0x0ac65000 0 0x1000>,
++			      <0 0x0ac66000 0 0x1000>,
++			      <0 0x0ac67000 0 0x1000>,
++			      <0 0x0ac68000 0 0x1000>,
++			      <0 0x0acaf000 0 0x4000>,
++			      <0 0x0acb6000 0 0x4000>,
++			      <0 0x0ac42000 0 0x5000>;
++			reg-names = "csid0",
++				    "csid1",
++				    "csiphy0",
++				    "csiphy1",
++				    "csiphy2",
++				    "csiphy3",
++				    "vfe0",
++				    "vfe1", "camnoc";
++
++			interrupts = <GIC_SPI 464 IRQ_TYPE_EDGE_RISING>,
++				     <GIC_SPI 466 IRQ_TYPE_EDGE_RISING>,
++				     <GIC_SPI 477 IRQ_TYPE_EDGE_RISING>,
++				     <GIC_SPI 478 IRQ_TYPE_EDGE_RISING>,
++				     <GIC_SPI 479 IRQ_TYPE_EDGE_RISING>,
++				     <GIC_SPI 448 IRQ_TYPE_EDGE_RISING>,
++				     <GIC_SPI 465 IRQ_TYPE_EDGE_RISING>,
++				     <GIC_SPI 467 IRQ_TYPE_EDGE_RISING>;
++			interrupt-names = "csid0",
++					  "csid1",
++					  "csiphy0",
++					  "csiphy1",
++					  "csiphy2",
++					  "csiphy3",
++					  "vfe0",
++					  "vfe1";
++
++			power-domains = <&camcc IFE_0_GDSC>,
++					<&camcc IFE_1_GDSC>,
++					<&camcc TITAN_TOP_GDSC>;
++			power-domain-names = "ife0", "ife1", "top";
++
++			clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
++				 <&camcc CAM_CC_CPAS_AHB_CLK>,
++				 <&camcc CAM_CC_CPHY_RX_CLK_SRC>,
++				 <&camcc CAM_CC_IFE_0_CSID_CLK>,
++				 <&camcc CAM_CC_IFE_0_CSID_CLK_SRC>,
++				 <&camcc CAM_CC_IFE_1_CSID_CLK>,
++				 <&camcc CAM_CC_IFE_1_CSID_CLK_SRC>,
++				 <&camcc CAM_CC_CSIPHY0_CLK>,
++				 <&camcc CAM_CC_CSI0PHYTIMER_CLK>,
++				 <&camcc CAM_CC_CSI0PHYTIMER_CLK_SRC>,
++				 <&camcc CAM_CC_CSIPHY1_CLK>,
++				 <&camcc CAM_CC_CSI1PHYTIMER_CLK>,
++				 <&camcc CAM_CC_CSI1PHYTIMER_CLK_SRC>,
++				 <&camcc CAM_CC_CSIPHY2_CLK>,
++				 <&camcc CAM_CC_CSI2PHYTIMER_CLK>,
++				 <&camcc CAM_CC_CSI2PHYTIMER_CLK_SRC>,
++				 <&camcc CAM_CC_CSIPHY3_CLK>,
++				 <&camcc CAM_CC_CSI3PHYTIMER_CLK>,
++				 <&camcc CAM_CC_CSI3PHYTIMER_CLK_SRC>,
++				 <&gcc GCC_CAMERA_AHB_CLK>,
++				 <&gcc GCC_CAMERA_HF_AXI_CLK>,
++				 <&camcc CAM_CC_SLOW_AHB_CLK_SRC>,
++				 <&camcc CAM_CC_CORE_AHB_CLK>,
++				 <&camcc CAM_CC_IFE_0_CLK>,
++				 <&camcc CAM_CC_IFE_0_AXI_CLK>,
++				 <&camcc CAM_CC_IFE_0_CPHY_RX_CLK>,
++				 <&camcc CAM_CC_IFE_0_CLK_SRC>,
++				 <&camcc CAM_CC_IFE_1_CLK>,
++				 <&camcc CAM_CC_IFE_1_AXI_CLK>,
++				 <&camcc CAM_CC_IFE_1_CPHY_RX_CLK>,
++				 <&camcc CAM_CC_IFE_1_CLK_SRC>;
++			clock-names = "camnoc_axi",
++				      "cpas_ahb",
++				      "cphy_rx_src",
++				      "csi0",
++				      "csi0_src",
++				      "csi1",
++				      "csi1_src",
++				      "csiphy0",
++				      "csiphy0_timer",
++				      "csiphy0_timer_src",
++				      "csiphy1",
++				      "csiphy1_timer",
++				      "csiphy1_timer_src",
++				      "csiphy2",
++				      "csiphy2_timer",
++				      "csiphy2_timer_src",
++				      "csiphy3",
++				      "csiphy3_timer",
++				      "csiphy3_timer_src",
++				      "gcc_camera_ahb",
++				      "gcc_camera_axi",
++				      "slow_ahb_src",
++				      "soc_ahb",
++				      "vfe0",
++				      "vfe0_axi",
++				      "vfe0_cphy_rx",
++				      "vfe0_src",
++				      "vfe1",
++				      "vfe1_axi",
++				      "vfe1_cphy_rx",
++				      "vfe1_src";
++
++			interconnects = <&gem_noc MASTER_AMPSS_M0 &config_noc SLAVE_CAMERA_CFG>,
++				<&mmss_noc MASTER_CAMNOC_HF0 &mc_virt SLAVE_EBI_CH0>,
++				<&mmss_noc MASTER_CAMNOC_SF &mc_virt SLAVE_EBI_CH0>,
++				<&camnoc_virt MASTER_CAMNOC_HF0_UNCOMP &camnoc_virt SLAVE_CAMNOC_UNCOMP>;
++			interconnect-names = "cam_ahb", "cam_hf_0_mnoc",
++				"cam_sf_0_mnoc", "cam_hf_0_camnoc";
++
++			iommus = <&apps_smmu 0x840 0x620>,
++				 <&apps_smmu 0x860 0x620>,
++				 <&apps_smmu 0xa40 0x620>,
++				 <&apps_smmu 0xa60 0x620>,
++				 <&apps_smmu 0xc40 0x620>,
++				 <&apps_smmu 0xc60 0x620>,
++				 <&apps_smmu 0xe40 0x620>,
++				 <&apps_smmu 0xe60 0x620>;
++
++			status = "disabled";
++
++			ports {
++				#address-cells = <1>;
++				#size-cells = <0>;
++			};
++		};
++
++	camcc: clock-controller@ad00000 {
++		compatible = "qcom,sm8150-camcc";
++		reg = <0 0x0ad00000 0 0x10000>;
++		clocks = <&rpmhcc RPMH_CXO_CLK>, <&gcc GCC_CAMERA_AHB_CLK>;
++		power-domains = <&rpmhpd SM8150_MMCX>;
++		required-opps = <&rpmhpd_opp_low_svs>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++		#power-domain-cells = <1>;
++		status = "disabled";
++	};
++};
+diff --git a/arch/arm64/boot/dts/qcom/sm8150-nabu-both-cameras.dtsi b/arch/arm64/boot/dts/qcom/sm8150-nabu-both-cameras.dtsi
+new file mode 100644
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sm8150-nabu-both-cameras.dtsi
+@@ -0,0 +1,86 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Board connections from nabu-r-oss and the installed vendor descriptors. */
++/ {
++	nabu_rear_avdd: regulator-camera-rear-analog {
++		compatible = "regulator-fixed";
++		regulator-name = "nabu-camera-rear-analog-enable";
++		vin-supply = <&vreg_bob>;
++		gpio = <&tlmm 11 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++};
++
++&nabu_front_avdd { status = "okay"; };
++&nabu_camera_dvdd { status = "okay"; };
++&nabu_camera_front { status = "okay"; };
++&camcc { status = "okay"; };
++
++&tlmm {
++	nabu_cci0_bus0: camera-cci0-bus0-state {
++		pins = "gpio17", "gpio18";
++		function = "cci_i2c";
++		drive-strength = <2>;
++		bias-pull-up;
++	};
++	nabu_camera_rear_mclk: camera-rear-mclk-state {
++		pins = "gpio13";
++		function = "cam_mclk";
++		drive-strength = <2>;
++		bias-disable;
++	};
++	nabu_camera_rear_reset: camera-rear-reset-state {
++		pins = "gpio28";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++	};
++};
++
++&cci0 {
++	status = "okay";
++	pinctrl-0 = <&nabu_cci0_bus0 &nabu_cci0_bus1>;
++	cci0_i2c0: i2c-bus@0 {
++		reg = <0>;
++		clock-frequency = <400000>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		nabu_camera_rear: camera@10 {
++			compatible = "ovti,ov13b10";
++			reg = <0x10>;
++			dovdd-supply = <&vreg_l1c_1p8>;
++			dvdd-supply = <&nabu_camera_dvdd>;
++			avdd-supply = <&nabu_rear_avdd>;
++			reset-gpios = <&tlmm 28 GPIO_ACTIVE_LOW>;
++			clocks = <&camcc CAM_CC_MCLK0_CLK>;
++			clock-names = "xvclk";
++			clock-frequency = <19200000>;
++			assigned-clocks = <&camcc CAM_CC_MCLK0_CLK>;
++			assigned-clock-rates = <19200000>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&nabu_camera_rear_mclk &nabu_camera_rear_reset>;
++			orientation = <1>;
++			rotation = <90>;
++			port {
++				nabu_rear_ep: endpoint {
++					data-lanes = <1 2 3 4>;
++					link-frequencies = /bits/ 64 <560000000>;
++					remote-endpoint = <&nabu_csiphy0_ep>;
++				};
++			};
++		};
++	};
++};
++
++&camss {
++	status = "okay";
++	ports {
++		port@0 {
++			reg = <0>;
++			nabu_csiphy0_ep: endpoint {
++				clock-lanes = <7>;
++				data-lanes = <0 1 2 3>;
++				remote-endpoint = <&nabu_rear_ep>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/qcom/sm8150-nabu-front-draft.dtsi b/arch/arm64/boot/dts/qcom/sm8150-nabu-front-draft.dtsi
+new file mode 100644
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sm8150-nabu-front-draft.dtsi
+@@ -0,0 +1,141 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Front OV8856 prototype. Every added device stays disabled for review.
++ * Wiring: Xiaomi nabu-r-oss camera DTS + this device's QTI module descriptor.
++ * CSI PHY voltage: original sm8150-camera.dtsi, PM8150L L3, 1.2 V.
++ * Do not enable until SM8150 CAMCC/CAMSS and power sequencing are integrated.
++ */
++
++/ {
++	/* This is an analog enable switch; its output voltage is not measured. */
++	nabu_front_avdd: regulator-camera-front-analog {
++		compatible = "regulator-fixed";
++		regulator-name = "nabu-camera-front-analog-enable";
++		vin-supply = <&vreg_bob>;
++		gpio = <&tlmm 31 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		status = "disabled";
++	};
++
++	/* Both stock sensor nodes use this rail, not the unused GPIO12 LDO. */
++	nabu_camera_dvdd: regulator-camera-digital {
++		compatible = "regulator-fixed";
++		regulator-name = "nabu-camera-digital-1p2";
++		regulator-min-microvolt = <1200000>;
++		regulator-max-microvolt = <1200000>;
++		vin-supply = <&vreg_s4a_1p8>;
++		gpio = <&pm8150l_gpios 3 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++		startup-delay-us = <135>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&nabu_camera_dvdd_enable>;
++		status = "disabled";
++	};
++};
++
++&pm8150l_gpios {
++	nabu_camera_dvdd_enable: camera-dvdd-enable-state {
++		pins = "gpio3";
++		function = "normal";
++		power-source = <0>;
++		bias-disable;
++	};
++};
++
++&tlmm {
++	nabu_camera_front_mclk: camera-front-mclk-state {
++		pins = "gpio14";
++		function = "cam_mclk";
++		drive-strength = <2>;
++		bias-disable;
++	};
++
++	nabu_camera_front_reset: camera-front-reset-state {
++		pins = "gpio30";
++		function = "gpio";
++		drive-strength = <2>;
++		bias-disable;
++	};
++
++	nabu_cci0_bus1: camera-cci0-bus1-state {
++		pins = "gpio19", "gpio20";
++		function = "cci_i2c";
++		drive-strength = <2>;
++		bias-pull-up;
++	};
++};
++
++&soc {
++	cci0: cci@ac4a000 {
++		compatible = "qcom,sm8150-cci", "qcom,sdm845-cci";
++		reg = <0 0x0ac4a000 0 0x1000>;
++		interrupts = <GIC_SPI 460 IRQ_TYPE_EDGE_RISING>;
++		power-domains = <&camcc TITAN_TOP_GDSC>;
++		clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
++			 <&camcc CAM_CC_CORE_AHB_CLK>,
++			 <&camcc CAM_CC_SLOW_AHB_CLK_SRC>,
++			 <&camcc CAM_CC_CPAS_AHB_CLK>,
++			 <&camcc CAM_CC_CCI_0_CLK>,
++			 <&camcc CAM_CC_CCI_0_CLK_SRC>;
++		clock-names = "camnoc_axi", "soc_ahb", "slow_ahb_src",
++			"cpas_ahb", "cci", "cci_src";
++		assigned-clocks = <&camcc CAM_CC_CAMNOC_AXI_CLK>,
++			<&camcc CAM_CC_CCI_0_CLK>;
++		assigned-clock-rates = <80000000>, <37500000>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&nabu_cci0_bus1>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "disabled";
++
++		cci0_i2c1: i2c-bus@1 {
++			reg = <1>;
++			clock-frequency = <400000>;
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			nabu_camera_front: camera@10 {
++				compatible = "ovti,ov8856";
++				reg = <0x10>;
++				dovdd-supply = <&vreg_l1c_1p8>;
++				avdd-supply = <&nabu_front_avdd>;
++				dvdd-supply = <&nabu_camera_dvdd>;
++				reset-gpios = <&tlmm 30 GPIO_ACTIVE_LOW>;
++				clocks = <&camcc CAM_CC_MCLK1_CLK>;
++				clock-names = "xvclk";
++				clock-frequency = <19200000>;
++				assigned-clocks = <&camcc CAM_CC_MCLK1_CLK>;
++				assigned-clock-rates = <19200000>;
++				pinctrl-names = "default";
++				pinctrl-0 = <&nabu_camera_front_mclk &nabu_camera_front_reset>;
++				orientation = <0>;
++				rotation = <270>;
++				status = "disabled";
++
++				port {
++					nabu_front_ep: endpoint {
++						data-lanes = <1 2>;
++						/* Upstream two-lane modes; the stock PLL table differs. */
++						link-frequencies = /bits/ 64 <720000000 360000000>;
++						remote-endpoint = <&nabu_csiphy1_ep>;
++					};
++				};
++			};
++		};
++	};
++};
++
++&camss {
++	/* The SM8150 resource port must request this single real CSI supply. */
++	mipi-csi-vdd-supply = <&vreg_l3c_1p2>;
++	ports {
++		port@1 {
++			reg = <1>;
++			nabu_csiphy1_ep: endpoint {
++				clock-lanes = <7>;
++				data-lanes = <0 1>;
++				remote-endpoint = <&nabu_front_ep>;
++			};
++		};
++	};
++};
+diff --git a/arch/arm64/boot/dts/qcom/sm8150-xiaomi-nabu-camera-review.dts b/arch/arm64/boot/dts/qcom/sm8150-xiaomi-nabu-camera-review.dts
+new file mode 100644
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sm8150-xiaomi-nabu-camera-review.dts
+@@ -0,0 +1,3 @@
++#include "sm8150-xiaomi-nabu-maverick.dts"
++#include "sm8150-camera-topology-draft.dtsi"
++#include "sm8150-nabu-front-draft.dtsi"
+diff --git a/arch/arm64/boot/dts/qcom/sm8150-xiaomi-nabu-camera.dts b/arch/arm64/boot/dts/qcom/sm8150-xiaomi-nabu-camera.dts
+new file mode 100644
+--- /dev/null
++++ b/arch/arm64/boot/dts/qcom/sm8150-xiaomi-nabu-camera.dts
+@@ -0,0 +1,4 @@
++#include "sm8150-xiaomi-nabu-maverick.dts"
++#include "sm8150-camera-topology-draft.dtsi"
++#include "sm8150-nabu-front-draft.dtsi"
++#include "sm8150-nabu-both-cameras.dtsi"

@@ -1,0 +1,11 @@
+# SPDX-License-Identifier: LicenseRef-Nabu-Camera-NonCommercial-1.0
+# Copyright (c) 2026 zouhong <admin@proyy.com>
+# Noncommercial use only; see LICENSE. Third-party components retain their licenses.
+SUBSYSTEM=="dma_heap", KERNEL=="system", GROUP="video", MODE="0660", TAG+="uaccess"
+SUBSYSTEM=="video4linux", GROUP="video", MODE="0660", TAG+="uaccess"
+SUBSYSTEM=="media", GROUP="video", MODE="0660", TAG+="uaccess"
+# CAMSS nodes are internal raw pipeline endpoints, not standalone webcams.
+SUBSYSTEM=="video4linux", ATTR{name}=="msm_vfe*_video*", ENV{ID_V4L_VERSION}="", ENV{ID_V4L_CAPABILITIES}=":mc:"
+SUBSYSTEM=="video4linux", ATTR{name}=="Pad-Front-Camera", SYMLINK+="nabu-camera-front", ENV{ID_V4L_PRODUCT}="Pad Front Camera", ENV{ID_V4L_CAPABILITIES}=":capture:"
+SUBSYSTEM=="video4linux", ATTR{name}=="Pad-Rear-Camera", SYMLINK+="nabu-camera-rear", ENV{ID_V4L_PRODUCT}="Pad Rear Camera", ENV{ID_V4L_CAPABILITIES}=":capture:"
+SUBSYSTEM=="leds", KERNEL=="nabu:white:flash", ACTION=="add|change", RUN+="/usr/bin/chgrp video /sys%p/brightness /sys%p/flash_strobe /sys%p/flash_brightness /sys%p/flash_timeout", RUN+="/usr/bin/chmod g+w /sys%p/brightness /sys%p/flash_strobe /sys%p/flash_brightness /sys%p/flash_timeout"

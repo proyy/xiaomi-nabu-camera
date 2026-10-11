@@ -1,0 +1,12 @@
+/build/
+/dist/
+/downloads/
+/sources/linux/
+/sources/libcamera/
+/sources/pipewire-1.0.5/
+__pycache__/
+*.pyc
+.DS_Store
+._*
+*.pem
+*.key

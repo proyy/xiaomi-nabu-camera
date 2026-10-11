@@ -1,0 +1,125 @@
+diff --git a/src/libcamera/pipeline/simple/simple.cpp b/src/libcamera/pipeline/simple/simple.cpp
+index e26f438..e067a2f 100644
+--- a/src/libcamera/pipeline/simple/simple.cpp
++++ b/src/libcamera/pipeline/simple/simple.cpp
+@@ -13,6 +13,7 @@
+ #include <memory>
+ #include <optional>
+ #include <queue>
++#include <string_view>
+ #include <set>
+ #include <stdint.h>
+ #include <string.h>
+@@ -280,7 +281,8 @@ class SimpleCameraData : public Camera::Private
+ public:
+ 	SimpleCameraData(SimplePipelineHandler *pipe,
+ 			 unsigned int numStreams,
+-			 MediaEntity *sensor);
++			 MediaEntity *sensor,
++			 const std::set<MediaEntity *> &reserved = {});
+ 
+ 	bool isValid() const { return sensor_ != nullptr; }
+ 	SimplePipelineHandler *pipe();
+@@ -453,6 +455,7 @@ private:
+ 	std::vector<MediaEntity *> locateSensors(MediaDevice *media);
+ 	static int resetRoutingTable(V4L2Subdevice *subdev);
+ 
++	const MediaPad *checkPipeline(SimpleCameraData *data);
+ 	const MediaPad *acquirePipeline(SimpleCameraData *data);
+ 	void releasePipeline(SimpleCameraData *data);
+ 
+@@ -468,7 +471,8 @@ private:
+ 
+ SimpleCameraData::SimpleCameraData(SimplePipelineHandler *pipe,
+ 				   unsigned int numStreams,
+-				   MediaEntity *sensor)
++				   MediaEntity *sensor,
++				   const std::set<MediaEntity *> &reserved)
+ 	: Camera::Private(pipe), streams_(numStreams), rawStream_(nullptr)
+ {
+ 	/*
+@@ -533,7 +537,8 @@ SimpleCameraData::SimpleCameraData(SimplePipelineHandler *pipe,
+ 		for (const MediaPad *pad : pads) {
+ 			for (MediaLink *link : pad->links()) {
+ 				MediaEntity *next = link->sink()->entity();
+-				if (visited.find(next) == visited.end()) {
++				if (visited.find(next) == visited.end() &&
++				    !reserved.count(next)) {
+ 					queue.push({ next, link->sink() });
+ 
+ 					Entity e{ entity, supportsRouting, sinkPad, pad, link };
+@@ -1505,6 +1510,9 @@ int SimplePipelineHandler::configure(Camera *camera, CameraConfiguration *c)
+ 	V4L2VideoDevice *video = data->video_;
+ 	int ret;
+ 
++	if (checkPipeline(data))
++		return -EBUSY;
++
+ 	/*
+ 	 * Configure links on the pipeline and propagate formats from the
+ 	 * sensor to the video node.
+@@ -1920,12 +1928,16 @@ bool SimplePipelineHandler::matchDevice(std::shared_ptr<MediaDevice> media,
+ 	 */
+ 	std::vector<std::unique_ptr<SimpleCameraData>> pipelines;
+ 	std::set<MediaEntity *> entities;
++	std::set<MediaEntity *> reserved;
+ 
+ 	pipelines.reserve(sensors.size());
+ 
+ 	for (MediaEntity *sensor : sensors) {
+ 		std::unique_ptr<SimpleCameraData> data =
+-			std::make_unique<SimpleCameraData>(this, numStreams, sensor);
++			std::make_unique<SimpleCameraData>(this, numStreams, sensor, reserved);
++		/* Keep serial capture available if no disjoint CAMSS path exists. */
++		if (!data->isValid() && !reserved.empty())
++			data = std::make_unique<SimpleCameraData>(this, numStreams, sensor);
+ 		if (!data->isValid()) {
+ 			LOG(SimplePipeline, Error)
+ 				<< "No valid pipeline for sensor '"
+@@ -1933,8 +1945,21 @@ bool SimplePipelineHandler::matchDevice(std::shared_ptr<MediaDevice> media,
+ 			continue;
+ 		}
+ 
+-		for (SimpleCameraData::Entity &entity : data->entities_)
++		for (SimpleCameraData::Entity &entity : data->entities_) {
+ 			entities.insert(entity.entity);
++			if (std::string_view(info.driver) == "qcom-camss") {
++				reserved.insert(entity.entity);
++				/* Prefer separate VFE cores for independent CSI inputs. */
++				const std::string &name = entity.entity->name();
++				auto rdi = name.find("_rdi");
++				if (name.starts_with("msm_vfe") && rdi != std::string::npos) {
++					const std::string prefix = name.substr(0, rdi + 1);
++					for (MediaEntity *candidate : media->entities())
++						if (candidate->name().starts_with(prefix))
++							reserved.insert(candidate);
++				}
++			}
++		}
+ 
+ 		pipelines.push_back(std::move(data));
+ 	}
+@@ -2081,7 +2106,7 @@ V4L2Subdevice *SimplePipelineHandler::subdev(const MediaEntity *entity)
+  * \brief Acquire all resources needed by the camera pipeline
+  * \return nullptr on success, a pointer to the contended pad on error
+  */
+-const MediaPad *SimplePipelineHandler::acquirePipeline(SimpleCameraData *data)
++const MediaPad *SimplePipelineHandler::checkPipeline(SimpleCameraData *data)
+ {
+ 	for (const SimpleCameraData::Entity &entity : data->entities_) {
+ 		const EntityData &edata = entities_[entity.entity];
+@@ -2099,6 +2124,14 @@ const MediaPad *SimplePipelineHandler::acquirePipeline(SimpleCameraData *data)
+ 		}
+ 	}
+ 
++	return nullptr;
++}
++
++const MediaPad *SimplePipelineHandler::acquirePipeline(SimpleCameraData *data)
++{
++	if (const MediaPad *pad = checkPipeline(data))
++		return pad;
++
+ 	for (const SimpleCameraData::Entity &entity : data->entities_) {
+ 		EntityData &edata = entities_[entity.entity];
+ 

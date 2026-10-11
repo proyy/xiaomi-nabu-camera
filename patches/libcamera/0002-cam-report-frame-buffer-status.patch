@@ -1,0 +1,10 @@
+--- a/src/apps/cam/camera_session.cpp
++++ b/src/apps/cam/camera_session.cpp
+@@ -501,6 +501,7 @@
+ 		const FrameMetadata &metadata = buffer->metadata();
+ 
+ 		info << " " << streamNames_[stream]
++		     << " status: " << static_cast<unsigned int>(metadata.status)
+ 		     << " seq: " << std::setw(6) << std::setfill('0') << metadata.sequence
+ 		     << " bytesused: ";
+ 

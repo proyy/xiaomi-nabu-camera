@@ -1,0 +1,29 @@
+{
+  "version": "1.2.0-3",
+  "functional_baseline": "1.2.0-2",
+  "changes": "Copyright, license scope, documentation, packaging metadata and source-document cleanup only",
+  "deb": {
+    "file": "nabu-camera_1.2.0-3_arm64.deb",
+    "bytes": 17696236,
+    "sha256": "a8a14bb5953a4d8dd567e5399eca64226b8674f9f80c87646e3dee210e940d72"
+  },
+  "checks": {
+    "root_ownership": true,
+    "no_top_level_lib": true,
+    "no_appledouble": true,
+    "kernel_modules": 661,
+    "elf_and_boot_files_identical": 672,
+    "application_python_ast_identical": true,
+    "maintainer_scripts_behavior_identical": true,
+    "service_config_behavior_identical": true,
+    "all_payload_hashes_valid": true,
+    "no_private_signing_keys": true,
+    "kernel_patch_files_match": 22,
+    "libcamera_patch_files_match": 15,
+    "published_inputs_reproduce_staging_files": 815,
+    "boot_integration_unit_tests": 8,
+    "flash_mock_unit_tests": 3
+  },
+  "hardware_retest_this_revision": false,
+  "hardware_validation": "See VALIDATION.md for the previously tested identical functional build."
+}

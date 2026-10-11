@@ -1,0 +1,18 @@
+{
+  "linux-6.1.10.tar.gz": {
+    "sha256": "473db230dd41dedcd653c63be3f321914ac44ad86b9677e45e5a1a0bb46363c9",
+    "bytes": 221157755
+  },
+  "libcamera-191e202178f02430b5942397c70d215cdd2056fa.tar.gz": {
+    "sha256": "06f8f82e5549e5cab5ae766f927639750e0cb1cc2d6cfad178c119abd48bad8f",
+    "bytes": 2175866
+  },
+  "pipewire_1.0.5.orig.tar.bz2": {
+    "sha256": "d5e5f3d0b8460e5711c1571c500156fd61768ba55a062eaeb94356abdb955a56",
+    "bytes": 1698291
+  },
+  "pipewire_1.0.5-1ubuntu3.3.debian.tar.xz": {
+    "sha256": "a1650f8e95859b3a8057ea95dad7e0509bfed9896db5b0d17c70910c4e9a3ff0",
+    "bytes": 51808
+  }
+}

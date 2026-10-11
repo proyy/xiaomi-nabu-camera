@@ -1,0 +1,145 @@
+diff --git a/drivers/media/i2c/ov8856.c b/drivers/media/i2c/ov8856.c
+--- a/drivers/media/i2c/ov8856.c
++++ b/drivers/media/i2c/ov8856.c
+@@ -8,6 +8,7 @@
+ #include <linux/gpio/consumer.h>
+ #include <linux/i2c.h>
+ #include <linux/module.h>
++#include <linux/of.h>
+ #include <linux/pm_runtime.h>
+ #include <linux/regulator/consumer.h>
+ #include <media/v4l2-ctrls.h>
+@@ -1749,6 +1750,7 @@
+ 		return ret;
+ 	}
+ 
++	dev_info(&client->dev, "identified OV8856 chip 0x%06x\n", val);
+ 	ov8856->identified = true;
+ 
+ 	return 0;
+@@ -1931,6 +1933,8 @@
+ static int ov8856_init_controls(struct ov8856 *ov8856)
+ {
+ 	struct v4l2_ctrl_handler *ctrl_hdlr;
++	struct v4l2_fwnode_device_properties props;
++	struct i2c_client *client = v4l2_get_subdevdata(&ov8856->sd);
+ 	s64 exposure_max, h_blank;
+ 	int ret;
+ 
+@@ -1997,6 +2001,13 @@
+ 	if (ctrl_hdlr->error)
+ 		return ctrl_hdlr->error;
+ 
++	ret = v4l2_fwnode_device_parse(&client->dev, &props);
++	if (ret)
++		return ret;
++	ret = v4l2_ctrl_new_fwnode_properties(ctrl_hdlr, &ov8856_ctrl_ops, &props);
++	if (ret)
++		return ret;
++
+ 	ov8856->sd.ctrl_handler = ctrl_hdlr;
+ 
+ 	return 0;
+@@ -2110,6 +2121,33 @@
+ 	return ret;
+ }
+ 
++static int ov8856_nabu_power_on(struct ov8856 *ov8856)
++{
++	int ret, i;
++
++	gpiod_set_value_cansleep(ov8856->reset_gpio, 1);
++	usleep_range(1000, 1500);
++	for (i = 0; i < ARRAY_SIZE(ov8856_supply_names); i++) {
++		ret = regulator_enable(ov8856->supplies[i].consumer);
++		if (ret)
++			goto disable_supplies;
++	}
++	gpiod_set_value_cansleep(ov8856->reset_gpio, 0);
++	usleep_range(5000, 5500);
++	ret = clk_prepare_enable(ov8856->xvclk);
++	if (ret)
++		goto assert_reset;
++	usleep_range(5000, 5500);
++	return 0;
++
++assert_reset:
++	gpiod_set_value_cansleep(ov8856->reset_gpio, 1);
++disable_supplies:
++	while (i-- > 0)
++		regulator_disable(ov8856->supplies[i].consumer);
++	return ret;
++}
++
+ static int __ov8856_power_on(struct ov8856 *ov8856)
+ {
+ 	struct i2c_client *client = v4l2_get_subdevdata(&ov8856->sd);
+@@ -2117,6 +2155,9 @@
+ 
+ 	if (is_acpi_node(dev_fwnode(&client->dev)))
+ 		return 0;
++
++	if (of_machine_is_compatible("xiaomi,nabu"))
++		return ov8856_nabu_power_on(ov8856);
+ 
+ 	ret = clk_prepare_enable(ov8856->xvclk);
+ 	if (ret < 0) {
+@@ -2155,6 +2196,18 @@
+ 	if (is_acpi_node(dev_fwnode(&client->dev)))
+ 		return;
+ 
++	if (of_machine_is_compatible("xiaomi,nabu")) {
++		int i;
++
++		clk_disable_unprepare(ov8856->xvclk);
++		usleep_range(1000, 1500);
++		gpiod_set_value_cansleep(ov8856->reset_gpio, 1);
++		usleep_range(1000, 1500);
++		for (i = ARRAY_SIZE(ov8856_supply_names) - 1; i >= 0; i--)
++			regulator_disable(ov8856->supplies[i].consumer);
++		return;
++	}
++
+ 	gpiod_set_value_cansleep(ov8856->reset_gpio, 1);
+ 	regulator_bulk_disable(ARRAY_SIZE(ov8856_supply_names),
+ 			       ov8856->supplies);
+@@ -2184,7 +2237,12 @@
+ 
+ 	mutex_lock(&ov8856->mutex);
+ 
+-	__ov8856_power_on(ov8856);
++	ret = __ov8856_power_on(ov8856);
++	if (ret) {
++		mutex_unlock(&ov8856->mutex);
++		return ret;
++	}
++
+ 	if (ov8856->streaming) {
+ 		ret = ov8856_start_streaming(ov8856);
+ 		if (ret) {
+@@ -2364,11 +2422,13 @@
+ 			return PTR_ERR(ov8856->xvclk);
+ 		}
+ 
+-		clk_set_rate(ov8856->xvclk, xvclk_rate);
++		ret = clk_set_rate(ov8856->xvclk, xvclk_rate);
++		if (ret)
++			return dev_err_probe(dev, ret, "failed to set xvclk rate\n");
+ 		xvclk_rate = clk_get_rate(ov8856->xvclk);
+ 
+ 		ov8856->reset_gpio = devm_gpiod_get_optional(dev, "reset",
+-							     GPIOD_OUT_LOW);
++							     GPIOD_OUT_HIGH);
+ 		if (IS_ERR(ov8856->reset_gpio))
+ 			return PTR_ERR(ov8856->reset_gpio);
+ 
+@@ -2404,7 +2464,8 @@
+ 		goto check_hwcfg_error;
+ 	}
+ 
+-	dev_dbg(dev, "Using %u data lanes\n", ov8856->cur_mode->data_lanes);
++	dev_dbg(dev, "Using %u data lanes\n",
++		bus_cfg.bus.mipi_csi2.num_data_lanes);
+ 
+ 	if (bus_cfg.bus.mipi_csi2.num_data_lanes == 2)
+ 		ov8856->priv_lane = &lane_cfg_2;

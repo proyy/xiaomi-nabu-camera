@@ -1,0 +1,28 @@
+diff --git a/src/apps/cam/file_sink.cpp b/src/apps/cam/file_sink.cpp
+index 65794a2..f8cbb46 100644
+--- a/src/apps/cam/file_sink.cpp
++++ b/src/apps/cam/file_sink.cpp
+@@ -9,6 +9,7 @@
+ 
+ #include <array>
+ #include <assert.h>
++#include <cstdio>
+ #include <fcntl.h>
+ #include <iomanip>
+ #include <iostream>
+@@ -131,8 +132,14 @@ void FileSink::writeBuffer(const Stream *stream, FrameBuffer *buffer,
+ 	}
+ #endif /* HAVE_TIFF */
+ 	if (fileType_ == FileType::Ppm) {
+-		ret = PPMWriter::write(filename.c_str(), stream->configuration(),
++		/* Publish a complete frame, so preview readers never see a torn PPM. */
++		std::string pending = filename + ".pending";
++		ret = PPMWriter::write(pending.c_str(), stream->configuration(),
+ 				       image->data(0));
++		if (!ret && std::rename(pending.c_str(), filename.c_str()))
++			ret = -errno;
++		if (ret < 0)
++			std::remove(pending.c_str());
+ 		if (ret < 0)
+ 			std::cerr << "failed to write PPM file `" << filename
+ 				  << "'" << std::endl;
